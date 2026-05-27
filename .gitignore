@@ -1,0 +1,70 @@
+# ============================================================
+# Credentials — NEVER commit
+# ============================================================
+.env
+.env.*
+!.env.example
+*cookie*.txt
+*cookie*.json
+# Raw "Copy as cURL" captures embed cookies, tokens, the real
+# domain, and live content — never commit them.
+curl*.txt
+*.curl
+
+# ============================================================
+# Backup data — REAL, potentially-confidential org content.
+# Treat as the most sensitive thing in the repo. The tool's own
+# output (page bodies, attachments, comments, native exports,
+# manifests, progress/key-mapping files) must NEVER be committed.
+# ============================================================
+backups/
+csv_export/
+*.xml
+*.zip
+
+# Native space exports / archives produced at runtime
+native/
+*.7z
+
+# ============================================================
+# Logs — DEBUG file logs can capture page text (truncated API
+# response bodies). Keep them local.
+# ============================================================
+*.log
+logs/
+
+# ============================================================
+# Python
+# ============================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ============================================================
+# IDEs / OS
+# ============================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# ============================================================
+# Claude Code — personal/local, not shared in the public repo
+# ============================================================
+CLAUDE.md
+CLAUDE.local.md
+CLAUDE_CODE_BOOTSTRAP.md
+.claude/
