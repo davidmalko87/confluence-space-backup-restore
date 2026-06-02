@@ -1,6 +1,9 @@
 # Confluence Space Backup & Restore
 
-[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg?logo=python&logoColor=white)](https://www.python.org/downloads/)
+[![CI](https://github.com/davidmalko87/confluence-space-backup-restore/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/davidmalko87/confluence-space-backup-restore/actions/workflows/ci.yml)
+[![PyPI version](https://img.shields.io/pypi/v/confluence-space-backup-restore.svg)](https://pypi.org/project/confluence-space-backup-restore/)
+[![PyPI downloads](https://img.shields.io/pypi/dm/confluence-space-backup-restore.svg)](https://pypi.org/project/confluence-space-backup-restore/)
+[![Python](https://img.shields.io/pypi/pyversions/confluence-space-backup-restore.svg?logo=python&logoColor=white)](https://pypi.org/project/confluence-space-backup-restore/)
 [![Confluence Cloud](https://img.shields.io/badge/Confluence-Cloud-0052CC.svg?logo=confluence&logoColor=white)](https://www.atlassian.com/software/confluence)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](#)
@@ -52,20 +55,20 @@ So an **automated, verifiable** backup *and restore* must be built on the REST A
 
 ### 1. Install
 
-**Clone for development:**
+**Via PyPI (recommended)** — provides the `confluence-backup` command:
+
+```bash
+pip install confluence-space-backup-restore
+confluence-backup
+```
+
+**Or clone for development:**
 
 ```bash
 git clone https://github.com/davidmalko87/confluence-space-backup-restore.git
 cd confluence-space-backup-restore
 pip install -r requirements.txt
 python main.py
-```
-
-**Or install as a package** (provides the `confluence-backup` command):
-
-```bash
-pip install .
-confluence-backup
 ```
 
 ### 2. Configure
