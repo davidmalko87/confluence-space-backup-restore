@@ -1,9 +1,10 @@
 name: Publish to PyPI
 
+# Publishing a GitHub Release (Releases -> Create a new release) is what ships
+# to PyPI. The release's tag (vX.Y.Z) is the version that gets built.
 on:
-  push:
-    tags:
-      - "v*"
+  release:
+    types: [published]
 
 jobs:
   publish:
@@ -15,6 +16,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
