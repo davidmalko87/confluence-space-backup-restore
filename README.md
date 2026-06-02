@@ -173,7 +173,7 @@ Each phase is resumable via `restore_progress.json`, and is marked complete only
 | 1 | Space | Create the target space (new key by default) | `POST /rest/api/space` |
 | 2 | Pages | Create parent-before-child; record old→new ID map | `POST /wiki/api/v2/pages` |
 | 3 | Blog posts | Create flat blog posts | `POST /wiki/api/v2/blogposts` |
-| 4 | Remap | Rewrite `ri:content-id` macro/link references | `PUT /wiki/api/v2/pages` |
+| 4 | Remap | Rewrite `ri:content-id` + source-space `ri:space-key` references | `PUT /wiki/api/v2/pages` |
 | 5 | Attachments | Upload binaries (idempotent PUT) | `PUT /rest/api/content/{id}/child/attachment` |
 | 6 | Comments | Footer comments; author/date prepended as text | `POST /wiki/api/v2/footer-comments` |
 | 7 | Labels | Re-apply page/blog labels | `POST /rest/api/content/{id}/label` |
@@ -192,9 +192,11 @@ These are **Confluence Cloud REST API constraints — not tool bugs**. The tool 
 |---|---|---|
 | Page bodies (storage format) | ✅ Restored | round-trippable |
 | Page hierarchy (parent/child) | ✅ Restored | rebuilt via `parentId`, parent-before-child |
+| Page links (same space) | ✅ Restored | Cloud stores links by **title**, which is preserved — they resolve natively in the new space, no remap needed |
+| Cross-space links to the source space | ✅ Restored | `ri:space-key` rewritten source→target in the remap pass; links to *other* spaces untouched |
 | Blog posts | ✅ Restored | flat |
 | Attachments (latest version) | ✅ Restored | v1 content download/upload; original filename kept |
-| Footer comments | ✅ Restored | original author/date added as a footer note |
+| Footer comments | ✅ Restored | original author + date added as a footer note |
 | Labels (page/blog) | ✅ Restored | v1 |
 | Page restrictions | ⚠️ Best-effort | identities must resolve in the target tenant |
 | Content / space properties | ⚠️ Best-effort | system-managed properties may reject writes |
@@ -205,7 +207,7 @@ These are **Confluence Cloud REST API constraints — not tool bugs**. The tool 
 | **Original created / updated dates** | ❌ Not settable | become the restore run time |
 | **Version history** | ❌ Not replayed | optional metadata sidecar only |
 | **Page / content IDs** | ♻️ Reassigned | new IDs minted; old→new map kept |
-| ID-referencing macros (`include`, `excerpt-include`, ID-rooted `children`/`pagetree`) | ⚠️ Remapped | `ri:content-id` rewritten in a 2nd pass; unmapped refs break — title+spaceKey refs survive natively |
+| ID-referencing macros (`include`, `excerpt-include`, ID-rooted `children`/`pagetree`) | ⚠️ Remapped (defensive) | `ri:content-id` rewritten in a 2nd pass; unmapped refs break. Most Cloud links use titles (above), so this mainly covers macros/migrated content that embed a numeric content ID |
 
 ---
 

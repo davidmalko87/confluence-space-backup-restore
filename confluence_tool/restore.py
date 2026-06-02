@@ -36,7 +36,7 @@ from xml.sax.saxutils import escape
 from confluence_tool import __version__
 from confluence_tool.api_client import ConfluenceApiError, ConfluenceClient
 from confluence_tool.config import ConfluenceConfig
-from confluence_tool.macros import body_has_content_ids, remap_body, scan_id_macros
+from confluence_tool.macros import remap_body, scan_id_macros
 from confluence_tool.progress import ProgressTracker
 from confluence_tool.utils import load_json, sanitize_filename
 
@@ -68,6 +68,10 @@ class RestoreManager:
         # homepage instead of creating a duplicate.
         self._source_homepage_id: str = ""
         self._new_homepage_id: str = ""
+        # Source/target space keys, for rewriting ri:space-key in links that
+        # point back into the space being restored.
+        self._source_space_key: str = ""
+        self._target_space_key: str = ""
 
     # ------------------------------------------------------------------
     # Public entry point
@@ -119,6 +123,8 @@ class RestoreManager:
         # restore doesn't leave a duplicate "<name> Home" page behind.
         self._source_homepage_id = str(space_meta.get("homepageId") or "")
         self._new_homepage_id = self._resolve_homepage_id(self._new_space_id)
+        self._source_space_key = str(space_meta.get("key") or "")
+        self._target_space_key = target_key
 
         self._run_phase("pages", lambda: self._restore_pages(pages))
         self._run_phase("blogposts", lambda: self._restore_blogposts(blogposts))
@@ -300,8 +306,18 @@ class RestoreManager:
     def _remap_bodies(
         self, pages: list[dict[str, Any]], blogposts: list[dict[str, Any]]
     ) -> None:
-        """Rewrite ri:content-id references using the full old->new content map."""
+        """Rewrite ri:content-id and source ri:space-key references in bodies.
+
+        Confluence Cloud stores most page links by title (which survive restore
+        natively), so this pass is a no-op for those and only rewrites bodies
+        that actually carry a remappable content-id or the source space key.
+        """
         id_map = self._progress.combined_content_map()
+        space_key_map: dict[str, str] = {}
+        if (self._source_space_key and self._target_space_key
+                and self._source_space_key != self._target_space_key):
+            space_key_map[self._source_space_key] = self._target_space_key
+
         for kind, items in (("pages", pages), ("blogposts", blogposts)):
             for content in items:
                 old_id = str(content["id"])
@@ -309,10 +325,11 @@ class RestoreManager:
                 if not new_id or self._progress.is_item_done("remap", f"{kind}:{old_id}"):
                     continue
                 value = self._with_footer(self._body_value(content), content)
-                if not body_has_content_ids(value, self.rep):
+                new_value, unmapped = remap_body(value, self.rep, id_map, space_key_map)
+                if new_value == value:
+                    # Nothing to rewrite (e.g. title-based links) — skip the PUT.
                     self._progress.mark_item_done("remap", f"{kind}:{old_id}")
                     continue
-                new_value, unmapped = remap_body(value, self.rep, id_map)
                 macros = scan_id_macros(value)
                 if unmapped:
                     logger.warning(
@@ -537,7 +554,7 @@ class RestoreManager:
         if self.rep != "storage":
             return value
         author = escape(self._author_label(content))
-        created = escape(str(content.get("createdAt", "") or "unknown date"))
+        created = escape(str(self._created_at(content) or "unknown date"))
         note = (
             f"<p><em>[Originally created by {author} on {created}; "
             f"restored via confluence-space-backup-restore v{__version__}]</em></p>"
@@ -560,6 +577,15 @@ class RestoreManager:
         self._progress.cache_user(account_id, name)
         return name
 
+    @staticmethod
+    def _created_at(content: dict[str, Any]) -> str | None:
+        """Original creation timestamp, or None.
+
+        Pages/blogs carry a top-level ``createdAt``; comments carry it under
+        ``version.createdAt`` instead.
+        """
+        return content.get("createdAt") or (content.get("version") or {}).get("createdAt")
+
     def _set_provenance(self, kind: str, new_id: str, content: dict[str, Any]) -> None:
         """Store original author/date/source-id as a machine-readable property."""
         if self.dry_run:
@@ -567,7 +593,7 @@ class RestoreManager:
         value = {
             "sourceId": str(content.get("id", "")),
             "authorId": content.get("authorId") or (content.get("version") or {}).get("authorId"),
-            "createdAt": content.get("createdAt"),
+            "createdAt": self._created_at(content),
             "sourceVersion": (content.get("version") or {}).get("number"),
             "restoredBy": f"confluence-space-backup-restore v{__version__}",
         }
