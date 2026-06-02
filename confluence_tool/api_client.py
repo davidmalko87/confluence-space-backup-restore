@@ -334,8 +334,9 @@ class ConfluenceClient:
                 time.sleep(self.config.api_delay)
                 logger.debug("%s %s -> %d", method, path, resp.status_code)
 
-                if resp.status_code in (200, 201, 204):
-                    if resp.status_code == 204 or not resp.text:
+                # 202 Accepted is returned by async operations (e.g. space delete).
+                if resp.status_code in (200, 201, 202, 204):
+                    if resp.status_code in (202, 204) or not resp.text:
                         return {}
                     try:
                         return resp.json()
