@@ -210,6 +210,13 @@ curl -su "$AUTH" -X POST "$SITE/api/v2/pages" -H 'Content-Type: application/json
   -d '{"spaceId":"<id>","status":"current","title":"rt-test","body":{"representation":"storage","value":"<p>hi</p>"}}'
 ```
 
+### Round-trip status: verified
+
+The REST backup→restore round-trip has been **proven end-to-end against a live
+Confluence Cloud site**: a space was backed up, restored into a fresh space, and
+diffed via the API — **page count, hierarchy, and attachment bytes all matched**.
+The native XML export path remains unverified (see above).
+
 ### Proving a restore (round-trip checklist)
 
 A backup is only proven once it has been **restored and verified**. On a non-prod

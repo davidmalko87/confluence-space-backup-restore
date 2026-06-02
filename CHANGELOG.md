@@ -24,6 +24,22 @@ All notable changes to this project are documented here. The format is based on
   connection test, config viewer, incomplete-backup cleanup.
 - Interactive menu and argparse CLI; manifest with sha256 + `complete` flag.
 
+### Verified
+- Round-trip proven end-to-end against a live Confluence Cloud site: a space was
+  backed up, restored into a fresh space, and diffed via the API — page count,
+  hierarchy, and attachment bytes all matched.
+
+### Empirically-found Cloud behaviors handled
+- Attachment download uses the v1 content endpoint
+  (`/rest/api/content/{id}/child/attachment/{attId}/download`); the
+  `_links.download` link Atlassian advertises is deprecated and 401s under token
+  auth.
+- Attachment upload uses a non-browser User-Agent (a browser-like UA makes
+  Confluence's XSRF filter reject the `X-Atlassian-Token: no-check` bypass) and
+  PUT for idempotent re-runs.
+- Restore adopts the space's auto-created homepage instead of leaving a duplicate.
+- Space resolution uses `description-format=plain` (spaces accept PLAIN/VIEW only).
+
 ### Known limitations
 - Cannot restore original timestamps, creator, or version history (Confluence
   Cloud API constraints). Inline-comment re-anchoring and space-permission
