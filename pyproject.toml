@@ -49,3 +49,9 @@ version = { attr = "confluence_tool.__version__" }
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+
+[tool.pytest.ini_options]
+# Put the repo root on sys.path so tests import confluence_tool without an
+# editable install (CI runs `pytest`, which otherwise wouldn't find the package).
+pythonpath = ["."]
+testpaths = ["tests"]
