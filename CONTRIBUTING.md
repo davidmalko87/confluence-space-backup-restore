@@ -52,16 +52,22 @@ are no API tokens or repository secrets. The `Publish to PyPI` workflow
    git commit -m "Bump version to X.Y.Z"
    git push
    ```
-3. Tag the release (the tag **must** match `__version__`, prefixed with `v`):
-   ```bash
-   git tag vX.Y.Z
-   git push origin vX.Y.Z
-   ```
-   Or create a GitHub Release (`gh release create vX.Y.Z --title "vX.Y.Z"`),
-   pasting the new `CHANGELOG.md` section as the body.
+3. **Create a GitHub Release** — this is what publishes to PyPI. Either:
+   - On GitHub: **Releases → Create a new release** → choose/create the tag
+     `vX.Y.Z` (must match `__version__`, prefixed with `v`) → title `vX.Y.Z` →
+     paste the new `CHANGELOG.md` section as the description → **Publish release**.
+   - Or via CLI:
+     ```bash
+     gh release create vX.Y.Z --title "vX.Y.Z" --latest --notes "…changelog section…"
+     ```
+   Publishing the release creates the tag (if needed), marks it **Latest**, and
+   triggers the `Publish to PyPI` workflow.
 4. Watch **Actions → Publish to PyPI**. If the `pypi` environment has a
    protection rule, approve the run. Verify at
    <https://pypi.org/project/confluence-space-backup-restore/>.
+
+> The publish workflow triggers on a **published GitHub Release** (not a bare
+> tag push), so the release and the PyPI upload happen in one step.
 
 > ⚠️ **PyPI versions are immutable** — a version can never be re-uploaded or
 > replaced, even after deletion. Any change requires a **new** version number.
