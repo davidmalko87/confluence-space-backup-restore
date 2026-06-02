@@ -95,9 +95,11 @@ class BackupManager:
     def _resolve_space(self, space_key: str) -> dict[str, Any] | None:
         """Resolve a space key to its full v2 object (key->id is via ?keys=)."""
         try:
+            # Space descriptions use SpaceDescriptionBodyRepresentation, which is
+            # PLAIN or VIEW only — NOT 'storage' (that's a page body-format value).
             data = self.client.get(
                 "/api/v2/spaces",
-                params={"keys": space_key, "description-format": "storage", "limit": 1},
+                params={"keys": space_key, "description-format": "plain", "limit": 1},
             )
         except ConfluenceApiError as exc:
             logger.error("Failed to resolve space '%s': %s", space_key, exc)
