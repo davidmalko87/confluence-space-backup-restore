@@ -12,7 +12,6 @@ integrity can be verified later and incomplete backups can be cleaned up safely.
 
 import hashlib
 import json
-import os
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
