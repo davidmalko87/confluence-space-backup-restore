@@ -29,6 +29,7 @@ classifiers = [
 
 [project.optional-dependencies]
 ui = ["rich>=13.0"]
+dev = ["pytest>=7.0", "ruff"]
 
 [project.urls]
 Homepage = "https://github.com/davidmalko87/confluence-space-backup-restore"
@@ -48,3 +49,9 @@ version = { attr = "confluence_tool.__version__" }
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+
+[tool.pytest.ini_options]
+# Put the repo root on sys.path so tests import confluence_tool without an
+# editable install (CI runs `pytest`, which otherwise wouldn't find the package).
+pythonpath = ["."]
+testpaths = ["tests"]
