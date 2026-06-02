@@ -141,7 +141,7 @@ preserves everything it can and records the rest.
 | Page bodies (storage format) | ✅ | ✅ | round-trippable |
 | Page hierarchy (parent/child) | ✅ | ✅ | rebuilt via `parentId`, parent-before-child |
 | Blog posts | ✅ | ✅ | flat |
-| Attachments (latest version) | ✅ | ✅ | v1 upload; original filename kept |
+| Attachments (latest version) | ✅ | ✅ | v1 content download endpoint (the `_links.download` link Atlassian advertises is deprecated and 401s under token auth); v1 upload; original filename kept |
 | Attachment version history | latest only | latest only | older versions not captured |
 | Footer comments | top-level | ✅ | original author/date added as a footer note |
 | Comment threads / replies | ❌ (v1.0) | ❌ | deferred |

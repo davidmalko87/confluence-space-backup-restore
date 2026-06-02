@@ -187,9 +187,17 @@ class ConfluenceClient:
         elif url.startswith("/"):
             url = self.base_url + url
 
+        # Binary endpoints 302-redirect to a presigned media.atlassian.com URL.
+        # requests follows it and strips the Authorization header on the
+        # cross-host hop (correct — the media URL is presigned). Override Accept
+        # so a content-negotiating endpoint streams bytes, not a JSON error.
+        dl_headers = {"Accept": "*/*"}
+
         for attempt in range(1, self.config.max_retries + 1):
             try:
-                resp = self.session.get(url, stream=True, timeout=(10, 600))
+                resp = self.session.get(
+                    url, stream=True, timeout=(10, 600), headers=dl_headers,
+                )
 
                 if resp.status_code == 429:
                     self._handle_rate_limit(resp, attempt)

@@ -188,17 +188,35 @@ class BackupManager:
                     self._counts.get("attachments", 0), downloaded)
 
     def _download_attachment(self, att: dict[str, Any], content_id: str, att_dir: str) -> bool:
-        """Download one attachment binary; returns True on success."""
-        links = att.get("_links") or {}
-        download = links.get("download")
-        if not download:
-            logger.warning("Attachment %s has no download link", att.get("id"))
-            return False
-        filename = sanitize_filename(att.get("title") or f"{att.get('id')}.bin")
-        dest = os.path.join(att_dir, content_id, f"{att.get('id')}_{filename}")
+        """Download one attachment binary; returns True on success.
+
+        Atlassian deprecated the ``_links.download`` URL (``/download/...?api=v2``),
+        which now returns 401 under API-token auth even though it is what the
+        metadata API advertises. The supported, token-authenticated path is the
+        v1 content download endpoint, which 302-redirects to Media Services:
+        ``/rest/api/content/{contentId}/child/attachment/{attId}/download``.
+        The deprecated link is kept only as a last-resort fallback.
+        """
+        att_id = str(att.get("id") or "")
+        filename = sanitize_filename(att.get("title") or f"{att_id}.bin")
+        dest = os.path.join(att_dir, content_id, f"{att_id}_{filename}")
         if os.path.exists(dest):  # resumable: skip already-downloaded files
             return True
-        return self.client.download_file(download, dest)
+
+        candidates: list[str] = []
+        if att_id:
+            candidates.append(
+                f"/rest/api/content/{content_id}/child/attachment/{att_id}/download"
+            )
+        legacy = (att.get("_links") or {}).get("download")
+        if legacy:
+            candidates.append(legacy)
+
+        for url in candidates:
+            if self.client.download_file(url, dest):
+                return True
+        logger.warning("Could not download attachment %s on content %s", att_id, content_id)
+        return False
 
     # ------------------------------------------------------------------
     # Comments (footer + inline, streamed)
