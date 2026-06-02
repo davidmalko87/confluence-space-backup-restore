@@ -65,3 +65,30 @@ def test_remap_adf_reports_unmapped():
 def test_remap_adf_tolerates_bad_json():
     new, unmapped = remap_adf("not json", {"1": "2"})
     assert new == "not json" and unmapped == set()
+
+
+# --- ri:space-key remap (cross-space links into the source space) ---
+
+LINK_SRC = '<ac:link><ri:page ri:content-title="B" ri:space-key="SRC" /></ac:link>'
+LINK_OTHER = '<ac:link><ri:page ri:content-title="X" ri:space-key="OTHER" /></ac:link>'
+
+
+def test_remap_storage_rewrites_source_space_key():
+    new, _ = remap_storage(LINK_SRC, {}, {"SRC": "DST"})
+    assert 'ri:space-key="DST"' in new
+    assert 'ri:space-key="SRC"' not in new
+
+
+def test_remap_storage_leaves_other_space_keys_untouched():
+    new, _ = remap_storage(LINK_OTHER, {}, {"SRC": "DST"})
+    assert 'ri:space-key="OTHER"' in new  # unchanged
+
+
+def test_remap_storage_no_space_map_is_noop():
+    new, _ = remap_storage(LINK_SRC, {})
+    assert new == LINK_SRC
+
+
+def test_remap_body_threads_space_key_map():
+    new, _ = remap_body(LINK_SRC, "storage", {}, {"SRC": "DST"})
+    assert 'ri:space-key="DST"' in new

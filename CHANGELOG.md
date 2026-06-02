@@ -4,6 +4,21 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [1.0.1] - 2026-06-02
+
+### Fixed
+- Comment attribution now records the original creation date (comments store it
+  under `version.createdAt`, not top-level `createdAt`), so the footer note no
+  longer shows "unknown date".
+
+### Added
+- Restore now rewrites `ri:space-key` on links that point back into the space
+  being restored (source space key → target space key), so a link that carried
+  the source key resolves in the new space. Links to other spaces are left
+  untouched. (Most Cloud links are stored by title and already survive restore
+  natively — this covers the cross-space edge case.)
+- A pytest suite (offline unit tests) run in CI across Python 3.10–3.13.
+
 ## [1.0.0] - 2026-05-27
 
 ### Added

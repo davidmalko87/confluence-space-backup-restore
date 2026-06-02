@@ -23,6 +23,12 @@ from typing import Any
 # ri:content-id="12345" inside <ri:page>/<ri:blog-post> references.
 _RI_CONTENT_ID_RE = re.compile(r'(ri:content-id=")(\d+)(")')
 
+# ri:space-key="SPACEKEY" — Confluence Cloud stores page links by title, and a
+# link that points back into its OWN space carries the source space key. On
+# restore into a different key, only that source key is rewritten to the target;
+# links to other spaces are left untouched.
+_RI_SPACE_KEY_RE = re.compile(r'(ri:space-key=")([^"]+)(")')
+
 # Structured-macro names that commonly embed a page/content ID and may need a
 # manual look if an unmapped ID remains. Used for reporting only.
 ID_BEARING_MACROS = (
@@ -35,24 +41,31 @@ ID_BEARING_MACROS = (
 _MACRO_NAME_RE = re.compile(r'ac:name="([^"]+)"')
 
 
-def remap_storage(storage: str, id_map: dict[str, str]) -> tuple[str, set[str]]:
-    """Rewrite ri:content-id references in a storage-format body.
+def remap_storage(
+    storage: str,
+    id_map: dict[str, str],
+    space_key_map: dict[str, str] | None = None,
+) -> tuple[str, set[str]]:
+    """Rewrite ri:content-id and (source) ri:space-key references in a body.
 
     Args:
         storage: The storage-format (XHTML) body.
         id_map: old content ID -> new content ID (strings).
+        space_key_map: old space key -> new space key. Only keys present in the
+            map are rewritten (typically just the source space's own key);
+            references to other spaces are left untouched.
 
     Returns:
-        (new_storage, unmapped) where ``unmapped`` is the set of old IDs that
-        were referenced but have no mapping (their references are left as-is and
-        will be broken until the referenced content is also restored).
+        (new_storage, unmapped) where ``unmapped`` is the set of old content IDs
+        that were referenced but have no mapping (left as-is and broken until the
+        referenced content is also restored).
     """
     if not storage:
         return storage, set()
 
     unmapped: set[str] = set()
 
-    def _sub(match: re.Match[str]) -> str:
+    def _sub_id(match: re.Match[str]) -> str:
         old_id = match.group(2)
         new_id = id_map.get(old_id)
         if new_id is None:
@@ -60,7 +73,17 @@ def remap_storage(storage: str, id_map: dict[str, str]) -> tuple[str, set[str]]:
             return match.group(0)
         return f"{match.group(1)}{new_id}{match.group(3)}"
 
-    return _RI_CONTENT_ID_RE.sub(_sub, storage), unmapped
+    out = _RI_CONTENT_ID_RE.sub(_sub_id, storage)
+
+    if space_key_map:
+        def _sub_key(match: re.Match[str]) -> str:
+            old_key = match.group(2)
+            new_key = space_key_map.get(old_key)
+            return f"{match.group(1)}{new_key}{match.group(3)}" if new_key else match.group(0)
+
+        out = _RI_SPACE_KEY_RE.sub(_sub_key, out)
+
+    return out, unmapped
 
 
 def remap_adf(adf: str, id_map: dict[str, str]) -> tuple[str, set[str]]:
@@ -105,11 +128,16 @@ def remap_body(
     value: str,
     representation: str,
     id_map: dict[str, str],
+    space_key_map: dict[str, str] | None = None,
 ) -> tuple[str, set[str]]:
-    """Dispatch ID remapping by body representation (storage or ADF)."""
+    """Dispatch ID/space-key remapping by body representation (storage or ADF).
+
+    Space-key remapping applies to storage format only (ADF page references are
+    content-ID based).
+    """
     if representation == "atlas_doc_format":
         return remap_adf(value, id_map)
-    return remap_storage(value, id_map)
+    return remap_storage(value, id_map, space_key_map)
 
 
 def body_has_content_ids(value: str, representation: str) -> bool:
