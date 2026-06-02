@@ -246,8 +246,14 @@ class ConfluenceClient:
     ) -> dict:
         """Upload a file as multipart form data (v1 attachment endpoint).
 
+        Uses **PUT**, which is idempotent: it adds the attachment or, if one with
+        the same filename already exists, stores a new version. (POST creates
+        only and 400s on a duplicate name, which breaks re-runnable restores.)
+
         Confluence requires the ``X-Atlassian-Token: no-check`` header for
         multipart uploads; the session sets it globally and we reassert it here.
+        The session's non-browser User-Agent is essential — a browser-like UA
+        makes the XSRF filter reject the no-check bypass (see auth.py).
 
         Args:
             path: API path (e.g. /rest/api/content/{id}/child/attachment).
@@ -270,13 +276,16 @@ class ConfluenceClient:
             try:
                 with open(file_path, "rb") as f:
                     files: dict[str, Any] = {"file": (filename, f)}
-                    resp = self.session.post(
+                    resp = self.session.put(
                         url, headers=headers, files=files, data=extra_fields or {},
                     )
                 time.sleep(self.config.api_delay)
 
                 if resp.status_code in (200, 201):
-                    return resp.json() if resp.text else {}
+                    try:
+                        return resp.json() if resp.text else {}
+                    except ValueError:
+                        return {}
                 if resp.status_code == 429:
                     self._handle_rate_limit(resp, attempt)
                     continue
@@ -328,7 +337,13 @@ class ConfluenceClient:
                 if resp.status_code in (200, 201, 204):
                     if resp.status_code == 204 or not resp.text:
                         return {}
-                    return resp.json()
+                    try:
+                        return resp.json()
+                    except ValueError:
+                        # A 2xx with a non-JSON body must not crash a long restore.
+                        logger.debug("Non-JSON 2xx from %s %s: %.120s",
+                                     method, path, resp.text)
+                        return {}
                 if resp.status_code == 429:
                     self._handle_rate_limit(resp, attempt)
                     continue

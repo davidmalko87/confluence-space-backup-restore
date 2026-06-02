@@ -13,15 +13,15 @@ Cookie header is supported only as an SSO/SAML fallback.
 import requests
 import urllib3
 
+from confluence_tool import __version__
 from confluence_tool.config import ConfluenceConfig
 
-# A browser-like User-Agent: Atlassian sometimes returns HTML error/login pages
-# (instead of JSON) to non-browser clients, which then fail to parse. This was a
-# real issue in the sibling full-instance tool, so we mirror its workaround.
-_USER_AGENT = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) confluence-space-backup-restore/1.0"
-)
+# A deliberately NON-browser User-Agent. Confluence's XSRF filter classifies any
+# browser-like UA (one containing "Mozilla") as a browser request and then
+# ignores the `X-Atlassian-Token: no-check` bypass — causing 403 "XSRF check
+# failed" on multipart attachment uploads (verified empirically). A plain UA
+# keeps the bypass effective and works for every REST and download call.
+_USER_AGENT = f"confluence-space-backup-restore/{__version__}"
 
 
 def build_session(config: ConfluenceConfig) -> requests.Session:

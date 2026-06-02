@@ -64,6 +64,10 @@ class RestoreManager:
         self.rep = config.body_format
         self._progress: ProgressTracker | None = None
         self._new_space_id: str = ""
+        # Creating a space auto-generates a homepage; we adopt it for the source
+        # homepage instead of creating a duplicate.
+        self._source_homepage_id: str = ""
+        self._new_homepage_id: str = ""
 
     # ------------------------------------------------------------------
     # Public entry point
@@ -110,6 +114,11 @@ class RestoreManager:
         if not self._new_space_id:
             logger.error("Could not determine target space id; aborting.")
             return False
+
+        # Adopt the space's auto-created homepage for the source homepage so the
+        # restore doesn't leave a duplicate "<name> Home" page behind.
+        self._source_homepage_id = str(space_meta.get("homepageId") or "")
+        self._new_homepage_id = self._resolve_homepage_id(self._new_space_id)
 
         self._run_phase("pages", lambda: self._restore_pages(pages))
         self._run_phase("blogposts", lambda: self._restore_blogposts(blogposts))
@@ -182,20 +191,69 @@ class RestoreManager:
     # Phase 2/3 — pages (top-down) and blog posts
     # ------------------------------------------------------------------
 
-    def _restore_pages(self, pages: list[dict[str, Any]]) -> None:
-        """Create pages parent-before-child and record the old->new id map."""
+    def _restore_pages(self, pages: list[dict[str, Any]]) -> int:
+        """Create pages parent-before-child and record the old->new id map.
+
+        Returns the number of pages that failed to create.
+        """
+        failures = 0
         for page in self._creation_order(pages):
             old_id = str(page["id"])
             if self._progress.is_mapped("pages", old_id):
+                continue
+            # The source homepage adopts the space's auto-created homepage (update
+            # in place) rather than being added as a duplicate child page.
+            if old_id == self._source_homepage_id and self._new_homepage_id:
+                if self._adopt_homepage(page):
+                    self._progress.map_id("pages", old_id, self._new_homepage_id)
+                else:
+                    failures += 1
                 continue
             parent_old = page.get("parentId")
             new_parent = self._progress.get_new_id("pages", str(parent_old)) if parent_old else None
             new_id = self._create_content("pages", page, new_parent)
             if new_id:
                 self._progress.map_id("pages", old_id, new_id)
+            else:
+                failures += 1
+        return failures
 
-    def _restore_blogposts(self, blogposts: list[dict[str, Any]]) -> None:
-        """Create blog posts (flat)."""
+    def _resolve_homepage_id(self, space_id: str) -> str:
+        """Return the space's homepage id (the page auto-created with the space)."""
+        try:
+            sp = self.client.get(f"/api/v2/spaces/{space_id}")
+        except ConfluenceApiError:
+            return ""
+        return str(sp.get("homepageId") or "")
+
+    def _adopt_homepage(self, page: dict[str, Any]) -> bool:
+        """Update the space's auto-created homepage to match the source homepage."""
+        new_id = self._new_homepage_id
+        title = page.get("title", "")
+        if self.dry_run:
+            logger.info("[DRY] would adopt space homepage as '%s' (id %s)", title, new_id)
+            return True
+        value = self._with_footer(self._body_value(page), page)
+        try:
+            current = self.client.get(f"/api/v2/pages/{new_id}")
+            next_ver = int((current.get("version") or {}).get("number", 1)) + 1
+            self.client.put(f"/api/v2/pages/{new_id}", {
+                "id": new_id,
+                "status": "current",
+                "title": title,
+                "body": {"representation": self.rep, "value": value},
+                "version": {"number": next_ver, "message": "restore: adopt homepage"},
+            })
+        except ConfluenceApiError as exc:
+            logger.error("Failed to adopt homepage as '%s': %s", title, exc)
+            return False
+        self._set_provenance("pages", new_id, page)
+        logger.info("Adopted space homepage as '%s'", title)
+        return True
+
+    def _restore_blogposts(self, blogposts: list[dict[str, Any]]) -> int:
+        """Create blog posts (flat). Returns the number that failed to create."""
+        failures = 0
         for blog in blogposts:
             old_id = str(blog["id"])
             if self._progress.is_mapped("blogposts", old_id):
@@ -203,6 +261,9 @@ class RestoreManager:
             new_id = self._create_content("blogposts", blog, None)
             if new_id:
                 self._progress.map_id("blogposts", old_id, new_id)
+            else:
+                failures += 1
+        return failures
 
     def _create_content(
         self, kind: str, content: dict[str, Any], new_parent_id: str | None
@@ -284,10 +345,14 @@ class RestoreManager:
     # Phase 5 — attachments
     # ------------------------------------------------------------------
 
-    def _restore_attachments(self, bdir: Path) -> None:
-        """Upload backed-up attachment binaries to their restored content."""
+    def _restore_attachments(self, bdir: Path) -> int:
+        """Upload backed-up attachment binaries to their restored content.
+
+        Returns the number of attachments that failed to upload.
+        """
         records = self._load(bdir, "attachments.json", default=[])
         att_root = bdir / "attachments"
+        failures = 0
         for rec in records:
             old_cid = str(rec.get("contentId"))
             kind = rec.get("contentType", "pages")
@@ -300,11 +365,13 @@ class RestoreManager:
             if not new_cid:
                 logger.warning("No mapping for %s %s; skipping attachment %s",
                                kind, old_cid, att_id)
+                failures += 1
                 continue
             filename = att.get("title") or f"{att_id}.bin"
             local = att_root / old_cid / f"{att_id}_{sanitize_filename(filename)}"
             if not local.exists():
                 logger.warning("Attachment binary missing on disk: %s", local)
+                failures += 1
                 continue
             if self.dry_run:
                 logger.info("[DRY] would upload attachment '%s' to %s %s",
@@ -319,14 +386,20 @@ class RestoreManager:
                 self._progress.mark_item_done("attachments", marker)
             except ConfluenceApiError as exc:
                 logger.warning("Attachment upload failed (%s): %s", filename, exc)
+                failures += 1
+        return failures
 
     # ------------------------------------------------------------------
     # Phase 6 — comments
     # ------------------------------------------------------------------
 
-    def _restore_comments(self, bdir: Path) -> None:
-        """Restore footer comments (top-level). Inline comments are skipped."""
+    def _restore_comments(self, bdir: Path) -> int:
+        """Restore footer comments (top-level). Inline comments are skipped.
+
+        Returns the number of footer comments that failed to create.
+        """
         footer = self._load(bdir, os.path.join("comments", "footer.json"), default=[])
+        failures = 0
         for rec in footer:
             old_cid = str(rec.get("contentId"))
             kind = rec.get("contentType", "pages")
@@ -351,6 +424,7 @@ class RestoreManager:
                 self._progress.mark_item_done("comments", marker)
             except ConfluenceApiError as exc:
                 logger.warning("Footer comment create failed on %s: %s", new_cid, exc)
+                failures += 1
 
         inline = self._load(bdir, os.path.join("comments", "inline.json"), default=[])
         if inline:
@@ -359,6 +433,7 @@ class RestoreManager:
                 "to text is unreliable via the API (see README). They remain in the "
                 "backup for reference.", len(inline),
             )
+        return failures
 
     # ------------------------------------------------------------------
     # Phase 7 — labels
@@ -569,8 +644,16 @@ class RestoreManager:
             logger.info("Phase '%s' already complete; skipping.", name)
             return
         logger.info("== Phase: %s ==", name)
-        fn()
-        self.done(name)
+        failures = fn() or 0
+        if failures:
+            # Leave the phase incomplete so the next run retries the failed items
+            # (the Jira tool's rule: a phase is complete only when fail == 0).
+            logger.warning(
+                "Phase '%s' had %d failure(s); not marking complete — re-run to "
+                "retry.", name, failures,
+            )
+        else:
+            self.done(name)
 
     def is_done(self, phase: str) -> bool:
         return bool(self._progress and self._progress.is_phase_complete(phase))
