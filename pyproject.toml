@@ -29,6 +29,7 @@ classifiers = [
 
 [project.optional-dependencies]
 ui = ["rich>=13.0"]
+dev = ["pytest>=7.0", "ruff"]
 
 [project.urls]
 Homepage = "https://github.com/davidmalko87/confluence-space-backup-restore"
