@@ -37,11 +37,13 @@ warrants the bump.
 
 Releases publish to PyPI automatically via **Trusted Publishing (OIDC)** — there
 are no API tokens or repository secrets. The `Publish to PyPI` workflow
-(`.github/workflows/publish.yml`) runs whenever a `v*` tag is pushed.
+(`.github/workflows/publish.yml`) runs when a GitHub Release is published.
 
-> **One-time setup** (see the README / repo maintainer notes): a *pending*
-> Trusted Publisher must be registered on PyPI and a GitHub deployment
-> environment named `pypi` must exist before the first release.
+> **One-time setup** (before the first release): on PyPI, register a Trusted
+> Publisher (a *pending* one if the project does not exist yet) with owner
+> `davidmalko87`, repository `confluence-space-backup-restore`, workflow
+> `publish.yml` and environment `pypi`; on GitHub, create a deployment
+> environment named `pypi` (Settings → Environments).
 
 1. Bump the version and update docs:
    - `confluence_tool/__init__.py` — update `__version__`
