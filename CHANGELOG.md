@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [1.0.2] - 2026-10-18
+
+### Changed
+- **README:** install from PyPI with `pip` or `pipx` (plus how to upgrade), run it with the `confluence-backup` console
+  command, and where `.env`, output and logs live; the docs were re-checked against the CLI and corrected.
+- **CI:** pin `ruff<0.16` (0.16 changed its default rules and failed lint on unchanged code), and add a job that
+  builds the sdist and wheel, runs `twine check`, installs the wheel and runs `confluence-backup --help`.
+
+Docs and CI only — no code changes.
+
 ## [1.0.1] - 2026-06-02
 
 ### Fixed

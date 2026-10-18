@@ -43,7 +43,7 @@ So an **automated, verifiable** backup *and restore* must be built on the REST A
 | **Dry-run mode** | Preview every restore action without making changes |
 | **Rate-limit aware** | Exponential backoff with `429 / Retry-After` detection |
 | **CSV export** | Export space content to CSV for reporting and sharing |
-| **Backup inspection** | Content-type breakdown, page-status counts, disk size (menu option 6 — crashes with a `TypeError` in 1.0.1, a known bug) |
+| **Backup inspection** | Content-type breakdown, page-status counts, disk size (menu option 6 — crashes with a `TypeError` in 1.0.2, a known bug) |
 | **Integrity validation** | sha256 manifest verification of every backed-up file (it cannot detect content that failed to download — see [Known Limitations](#%EF%B8%8F-known-limitations)) |
 | **Connection test** | Pre-flight: authentication + space listing |
 | **Interactive menu + CLI** | Guided workflow, or `--backup` / `--restore` / `--export-csv` flags for scripts and cron |
@@ -120,7 +120,7 @@ From a clone, use `python main.py` in place of `confluence-backup` — the flags
 
 ```
 ==============================================================
-  Confluence Space Backup & Restore  v1.0.1
+  Confluence Space Backup & Restore  v1.0.2
 ==============================================================
   Site: https://your-domain.atlassian.net   Auth: API token   Backups: ./backups
 --------------------------------------------------------------
@@ -186,7 +186,7 @@ confluence-backup --env ~/.config/confluence-backup/.env --list      # use a .en
 
 Use one action per run: if several are given, only the first of `--list`, `--validate`, `--export-csv`, `--backup`, `--restore` runs and the rest are ignored.
 
-Exit codes (`confluence-backup`): `0` success · `1` failure · `2` bad/insufficient arguments. Known gaps in 1.0.1: a restore that leaves failed items and a backup whose attachment downloads or reads failed both exit `0` (check the log for warnings such as `had N failure(s)` or `Could not download attachment`), and `python main.py` discards the result code, so a backup, restore or `--validate` that reports failure still exits `0` — for scripts and cron use `confluence-backup` (in a clone: `pip install -e .`).
+Exit codes (`confluence-backup`): `0` success · `1` failure · `2` bad/insufficient arguments. Known gaps in 1.0.2: a restore that leaves failed items and a backup whose attachment downloads or reads failed both exit `0` (check the log for warnings such as `had N failure(s)` or `Could not download attachment`), and `python main.py` discards the result code, so a backup, restore or `--validate` that reports failure still exits `0` — for scripts and cron use `confluence-backup` (in a clone: `pip install -e .`).
 
 ---
 
@@ -265,7 +265,7 @@ Most of these are **Confluence Cloud REST API constraints — not tool bugs**. T
 ## 🛡️ Restore Safety
 
 - **Default: a NEW space is created.** The tool refuses to modify an existing space key.
-- **Restore state belongs to the backup directory, not to the target key.** Before restoring the same backup to a *different* key (for example the real restore after a `SCRATCH` test), delete `restore_progress.json` and `id_maps.json` from the backup directory. Otherwise 1.0.1 skips the space phase, including the existing-space check above: if the new key does not exist yet, the restore aborts with `Could not determine target space id`; if it does exist, the restore writes into that space without `--overwrite` and skips everything the earlier run already restored (after a finished run it reports success while restoring nothing).
+- **Restore state belongs to the backup directory, not to the target key.** Before restoring the same backup to a *different* key (for example the real restore after a `SCRATCH` test), delete `restore_progress.json` and `id_maps.json` from the backup directory. Otherwise 1.0.2 skips the space phase, including the existing-space check above: if the new key does not exist yet, the restore aborts with `Could not determine target space id`; if it does exist, the restore writes into that space without `--overwrite` and skips everything the earlier run already restored (after a finished run it reports success while restoring nothing).
 - **Touching an existing space requires `--overwrite` *and* typing the space key to confirm** (the menu always prompts; non-interactive CLI honors the flag). Even then, restore is **additive** — it deletes no pages — but the existing space's **homepage title and body are replaced** by the backup's homepage (the previous version stays in page history).
 - **Dry-run** (`--dry-run`) prints the full plan and writes nothing.
 - A **trashed (not-yet-purged) space key** is detected — restore stops and tells you to purge it (Settings → Data Management → Trashed Spaces) or pick another key.
